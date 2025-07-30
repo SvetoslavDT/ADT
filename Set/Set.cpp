@@ -42,7 +42,7 @@ public:
 			return *this;
 		}
 
-		ConstIterator operator++()
+		ConstIterator operator++(int)
 		{
 			ConstIterator temp(*this);
 			++(*this);
