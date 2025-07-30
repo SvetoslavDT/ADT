@@ -1,20 +1,258 @@
-// toDelete.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-
 #include <iostream>
+#include <stack>
 
-int main()
+template<typename T, typename Compare = std::less<T>>
+class Set
 {
-    std::cout << "Hello World!\n";
+public:
+
+	Set() = default;
+	explicit Set(const Compare& comparator) : comp(comparator) {}
+	Set(const Set<T, Compare>& other);
+	Set<T, Compare>& operator=(const Set<T, Compare>& other);
+	~Set();
+
+	bool insert(const T& el);
+	bool contains(const T& el) const;
+	bool remove(const T& el);
+
+	size_t getSize() const;
+	bool isEmpty() const;
+
+	class ConstIterator
+	{
+	public:
+
+		ConstIterator(Node* root = nullptr)
+		{
+			pushLeft(root);
+		}
+
+		const T& operator*() const
+		{
+			return nodeStack.top()->data;
+		}
+
+		ConstIterator& operator++()
+		{
+			Node* node = nodeStack.top();
+			nodeStack.pop();
+			if (node->right)
+				pushLeft(node->right);
+			return *this;
+		}
+
+		ConstIterator operator++()
+		{
+			ConstIterator temp(*this);
+			++(*this);
+			return temp;
+		}
+
+		bool operator==(const ConstIterator& other) const
+		{
+			return nodeStack == other.nodeStack;
+		}
+
+		bool operator!=(const ConstIterator& other) const
+		{
+			return nodeStack != other.nodeStack;
+		}
+
+	private:
+
+		std::stack<Node*> nodeStack;
+
+		void pushLeft(Node* node)
+		{
+			while (node)
+			{
+				nodeStack.push(node);
+				node = node->left;
+			}
+		}
+	};
+
+	ConstIterator cbegin() const
+	{
+		return ConstIterator(root);
+	}
+
+	ConstIterator cend() const
+	{
+		return ConstIterator(nullptr);
+	}
+
+private:
+
+	struct Node
+	{
+		T data;
+		Node* left;
+		Node* right;
+
+		Node(const T& data, Node* left = nullptr, Node* right = nullptr) : data(data), left(left), right(right) {}
+	};
+
+	Node* root = nullptr;
+	size_t size = 0;
+	Compare comp;
+
+	Node** findMinNode(Node** root);
+	void free(Node* current);
+	Node* copy(Node* current);
+};
+
+template<typename T, typename Compare>
+bool Set<T, Compare>::insert(const T& el)
+{
+	Node** current = &root;
+
+	while (*current)
+	{
+		if (comp(el, (*current)->data))
+			current = &(*current)->left;
+		else if (comp((*current)->data, el))
+			current = &(*current)->right;
+		else
+			return false;
+	}
+
+	*current = new Node(el);
+	++size;
+	return true;
 }
 
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
+template<typename T, typename Compare>
+bool Set<T, Compare>::contains(const T& el) const
+{
+	Node* current = root;
 
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
+	while (current)
+	{
+		if (comp(el, current->data))
+			current = current->left;
+		else if (comp(current->data, el))
+			current = current->right;
+		else
+			return true;
+	}
+
+	return false;
+}
+
+template<typename T, typename Compare>
+typename Set<T, Compare>::Node** Set<T, Compare>::findMinNode(Node** root)
+{
+	Node** current = &root;
+
+	while ((*current)->left)
+	{
+		current = &(*current)->left;
+	}
+
+	return current;
+}
+
+template<typename T, typename Compare>
+bool Set<T, Compare>::remove(const T& el)
+{
+	Node** current = &root;
+
+	while (*current)
+	{
+		if (comp(data, (*current)->data))
+			current = &(*current)->left;
+		else if (comp((*current)->data, data))
+			current = &(*current)->right;
+		else
+			break;
+	}
+
+	if (!(*current))
+		return false;
+
+	Node* toDelete = *current;
+
+	if (!(*current)->left && !(*current)->right)
+		*current = nullptr;
+	else if (!(*current)->right)
+		*current = (*current)->left;
+	else if (!(*current)->left)
+		*current = (*current)->right;
+	else
+	{
+		Node** rightMin = findMinNode(&(*current)->right);
+		*current = *rightMin;
+		*rightMin = (*rightMin)->right;
+
+		(*current)->left = toDelete->left;
+		(*current)->right = toDelete->right;
+	}
+
+	delete toDelete;
+	--size;
+	return true;
+}
+
+template <class T, typename Compare>
+size_t Set<T, Compare>::getSize() const
+{
+	return size;
+}
+
+template <class T, typename Compare>
+bool Set<T, Compare>::isEmpty() const
+{
+	return getSize() == 0;
+}
+
+template <class T, typename Compare>
+typename Set<T, Compare>::Node* Set<T, Compare>::copy(Node* current)
+{
+	if (!current)
+		return nullptr;
+
+	Node* res = new Node(current->data);
+	res->right = copy(current->left);
+	res->right = copy(current->right);
+	return res;
+}
+
+template <class T, typename Compare>
+void Set<T, Compare>::free(Node* current)
+{
+	if (!current)
+		return;
+
+	free(current->left);
+	free(current->right);
+	delete current;
+}
+
+template <class T, typename Compare>
+Set<T, Compare>::Set(const Set<T, Compare>& other) : comp(other.comp)
+{
+	root = copy(other.root);
+	size = other.size;
+}
+
+template <class T, typename Compare>
+Set<T, Compare>& Set<T, Compare>::operator=(const Set<T, Compare>& other)
+{
+	if (this != &other)
+	{
+		free(root);
+		root = copy(other.root);
+		size = other.size;
+		comp = other.comp;
+	}
+
+	return *this;
+}
+
+template <class T, typename Compare>
+Set<T, Compare>::~Set()
+{
+	free(root);
+}
